@@ -41,8 +41,10 @@
     $("userEmail").textContent = user ? user.email : "התחבר כדי להתחיל";
     $("avatar").textContent = user ? (user.email?.[0] || "U").toUpperCase() : "?";
     $("logoutButton").hidden = !user;
-    $("uploadTopButton").disabled = !user;
-    $("emptyUploadButton").disabled = !user;
+    // The top upload action should open sign-in while signed out.
+    $("uploadTopButton").disabled = false;
+    // Keep the empty-state button enabled while signed out: it opens auth.
+    $("emptyUploadButton").disabled = false;
     if (!user) { state.files = []; renderFiles(); }
   }
   function updateStats() {
