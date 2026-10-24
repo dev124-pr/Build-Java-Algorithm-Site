@@ -141,7 +141,9 @@
   function setupDownload() {
     const button = $("downloadButton");
     if (cfg.downloadUrl) {
-      button.href = cfg.downloadUrl;
+      // Let the browser handle the same-origin static file directly. Fetching
+      // into a Blob can fail on GitHub Pages/CDN responses even when the URL works.
+      button.href = new URL(cfg.downloadUrl, window.location.href).href;
       button.classList.remove("disabled"); button.classList.add("ready"); button.removeAttribute("aria-disabled");
       button.removeAttribute("target"); button.removeAttribute("rel");
       let fileName = cfg.downloadFileName || "";
@@ -151,29 +153,6 @@
       $("downloadBadge").textContent = "זמין להורדה"; $("downloadBadge").style.color = "var(--lime)";
       $("downloadDescription").textContent = `הורידו את ${fileName} למחשב שלכם.`;
       $("downloadMeta").textContent = cfg.downloadLabel || "JAVA SOURCE · קובץ Java";
-      button.addEventListener("click", async (event) => {
-        event.preventDefault();
-        if (button.dataset.downloading === "true") return;
-        button.dataset.downloading = "true";
-        const label = $("downloadButtonText").textContent;
-        $("downloadButtonText").textContent = "מכינים את הקובץ…";
-        try {
-          const response = await fetch(button.href, { cache: "no-store" });
-          if (!response.ok) throw new Error(`Download failed: ${response.status}`);
-          const blobUrl = URL.createObjectURL(await response.blob());
-          const link = document.createElement("a");
-          link.href = blobUrl;
-          link.download = fileName || "download.java";
-          document.body.append(link); link.click(); link.remove();
-          window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        } catch (error) {
-          toast("לא הצלחנו להוריד את הקובץ. בדוק/י שהוא נמצא במאגר שפורסם.", "error");
-          console.error(error);
-        } finally {
-          button.dataset.downloading = "false";
-          $("downloadButtonText").textContent = label;
-        }
-      });
     }
     else button.addEventListener("click", (event) => event.preventDefault());
   }
