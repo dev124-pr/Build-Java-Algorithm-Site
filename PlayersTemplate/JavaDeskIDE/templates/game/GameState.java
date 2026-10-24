@@ -1,4 +1,4 @@
-package templates.game;
+package game;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,7 +9,6 @@ public class GameState {
     private List<Target> targets;
     private List<PlayerInfo> players;
 
-    // מחלקה פנימית שמייצגת מידע על שחקן על הלוח
     public static class PlayerInfo {
         public String name;
         public int x;
@@ -25,28 +24,13 @@ public class GameState {
             this.isDisqualified = isDisqualified;
         }
 
-        public String getName() {
-            return name;
-        }
-
-        public int getX() {
-            return x;
-        }
-
-        public int getY() {
-            return y;
-        }
-
-        public int getScore() {
-            return score;
-        }
-
-        public boolean isDisqualified() {
-            return isDisqualified;
-        }
+        public String getName() { return name; }
+        public int getX() { return x; }
+        public int getY() { return y; }
+        public int getScore() { return score; }
+        public boolean isDisqualified() { return isDisqualified; }
     }
 
-    // קונסטרוקטור ראשי המקבל את מימדי הלוח, רשימת המטרות ורשימת השחקנים
     public GameState(int width, int height, List<Target> targets, List<PlayerEntity> playerEntities) {
         this.width = width;
         this.height = height;
@@ -60,25 +44,12 @@ public class GameState {
         }
     }
 
-    // קונסטרוקטור משני לתאימות לאחור (במידה ולא מועברת רשימת שחקנים)
     public GameState(int width, int height, List<Target> targets) {
         this(width, height, targets, new ArrayList<>());
     }
 
-    // מתודות שליפה (Getters)
-    public int getWidth() {
-        return width;
-    }
-
-    public int getHeight() {
-        return height;
-    }
-
-    public List<Target> getTargets() {
-        return targets;
-    }
-
-    public List<PlayerInfo> getPlayers() {
-        return players;
-    }
+    public int getWidth() { return width; }
+    public int getHeight() { return height; }
+    public List<Target> getTargets() { return targets; }
+    public List<PlayerInfo> getPlayers() { return players; }
 }

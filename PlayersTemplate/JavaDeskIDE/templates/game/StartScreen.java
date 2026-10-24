@@ -1,27 +1,17 @@
-package templates.game;
+package game;
 
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
-import java.io.FileWriter;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class StartScreen extends JFrame {
-    private DefaultListModel<String> playerListModel;
-    private JList<String> playerJList;
-    private JButton startButton;
-    private Timer syncTimer;
-
-    private static final String SUPABASE_URL = "https://dayfulbpekslvtpwlwkb.supabase.co";
-    private static final String SUPABASE_KEY = "sb_publishable_ZM5J48yz44WE3ztjrx1xdw_a6Yng8jM";
-    private static final String STORAGE_BUCKET = "java-files";
+    private final DefaultListModel<String> playerListModel = new DefaultListModel<>();
+    private final JButton startButton = new JButton("START GAME");
+    private final Timer refreshTimer;
 
     public StartScreen() {
         setTitle("Algorithm Battle - Start Screen");
@@ -30,175 +20,81 @@ public class StartScreen extends JFrame {
         setLocationRelativeTo(null);
         setLayout(new BorderLayout());
 
-        JLabel titleLabel = new JLabel("Algorithm Battle Arena", JLabel.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 22));
-        titleLabel.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
-        add(titleLabel, BorderLayout.NORTH);
+        JLabel title = new JLabel("Algorithm Battle Arena", JLabel.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 22));
+        title.setBorder(BorderFactory.createEmptyBorder(20, 0, 10, 0));
+        add(title, BorderLayout.NORTH);
 
-        playerListModel = new DefaultListModel<>();
-        playerJList = new JList<>(playerListModel);
-        playerJList.setFont(new Font("Arial", Font.PLAIN, 14));
-        JScrollPane scrollPane = new JScrollPane(playerJList);
-        scrollPane.setBorder(BorderFactory.createTitledBorder(" Live Lobby (Auto-Syncing) "));
-        add(scrollPane, BorderLayout.CENTER);
+        JList<String> list = new JList<>(playerListModel);
+        list.setFont(new Font("Arial", Font.PLAIN, 14));
+        JScrollPane scroll = new JScrollPane(list);
+        scroll.setBorder(BorderFactory.createTitledBorder(" Local Players folder "));
+        add(scroll, BorderLayout.CENTER);
 
-        JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        bottomPanel.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
-
-        startButton = new JButton("START GAME");
         startButton.setFont(new Font("Arial", Font.BOLD, 18));
         startButton.setBackground(new Color(46, 204, 113));
         startButton.setForeground(Color.WHITE);
         startButton.setFocusPainted(false);
         startButton.setPreferredSize(new Dimension(180, 50));
-
         startButton.addActionListener(e -> startGame());
-        bottomPanel.add(startButton);
-        add(bottomPanel, BorderLayout.SOUTH);
+        JPanel bottom = new JPanel();
+        bottom.setBorder(BorderFactory.createEmptyBorder(15, 0, 15, 0));
+        bottom.add(startButton);
+        add(bottom, BorderLayout.SOUTH);
 
-        // סינכרון ראשוני מיד בהפעלה
-        syncPlayers();
-
-        // לופ שרץ כל שנייה ברקע ומעדכן את הלובי אוטומטית
-        syncTimer = new Timer(1000, e -> checkServerUpdates());
-        syncTimer.start();
+        refreshPlayers();
+        refreshTimer = new Timer(1500, e -> refreshPlayers());
+        refreshTimer.start();
     }
 
-    private void syncPlayers() {
+    private void refreshPlayers() {
+        File dir = new File("templates/Players");
+        if (!dir.exists()) dir.mkdirs();
+        File[] files = dir.listFiles((d, name) -> name.endsWith(".java") && !name.equals("temp_player.java"));
+        List<String> names = new ArrayList<>();
+        if (files != null) {
+            for (File file : files) names.add(readDisplayName(file));
+        }
         playerListModel.clear();
-        downloadAndSyncFiles();
+        for (String name : names) playerListModel.addElement(name);
+        startButton.setEnabled(true);
     }
 
-    private void checkServerUpdates() {
-        new Thread(this::downloadAndSyncFiles).start();
-    }
-
-    private void downloadAndSyncFiles() {
-        try {
-            File playersDir = new File("D:\\BuildAnAlgorithm\\BuildAnAlgorithm\\Players");
-            if (!playersDir.exists()) {
-                playersDir.mkdirs();
-            }
-
-            HttpClient client = HttpClient.newHttpClient();
-            String listUrl = SUPABASE_URL + "/storage/v1/object/list /" + STORAGE_BUCKET;
-            // תיקון כתובת ה-URL שלא יהיו רווחים בטעות
-            listUrl = SUPABASE_URL + "/storage/v1/object/list/" + STORAGE_BUCKET;
-
-            String requestBody = "{\"prefix\": \"\", \"limit\": 100, \"offset\": 0}";
-
-            HttpRequest listRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(listUrl))
-                    .header("apikey", SUPABASE_KEY)
-                    .header("Authorization", "Bearer " + SUPABASE_KEY)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                    .build();
-
-            HttpResponse<String> listResponse = client.send(listRequest, HttpResponse.BodyHandlers.ofString());
-            if (listResponse.statusCode() != 200) return;
-
-            String jsonList = listResponse.body();
-
-            // חילוץ כל שמות הקבצים שמסתיימים ב-.java באמצעות Regex מדויק מתוך ה-JSON
-            List<String> serverFileNames = new ArrayList<>();
-            Matcher nameKeyMatcher = Pattern.compile("\"name\"\\s*:\\s*\"([^\"]+\\.java)\"").matcher(jsonList);
-            while (nameKeyMatcher.find()) {
-                serverFileNames.add(nameKeyMatcher.group(1));
-            }
-
-            List<String> activePlayerDisplayNames = new ArrayList<>();
-
-            for (String fileName : serverFileNames) {
-                String encodedPath = fileName.replace(" ", "%20");
-                String fileUrl = SUPABASE_URL + "/storage/v1/object/" + STORAGE_BUCKET + "/" + encodedPath;
-
-                HttpRequest fileRequest = HttpRequest.newBuilder()
-                        .uri(URI.create(fileUrl))
-                        .header("apikey", SUPABASE_KEY)
-                        .header("Authorization", "Bearer " + SUPABASE_KEY)
-                        .GET()
-                        .build();
-
-                HttpResponse<String> fileResponse = client.send(fileRequest, HttpResponse.BodyHandlers.ofString());
-                if (fileResponse.statusCode() == 200) {
-                    String fileContent = fileResponse.body();
-
-                    // זיהוי שם המחלקה
-                    String detectedClassName = "";
-                    Matcher classMatcher = Pattern.compile("public\\s+class\\s+(\\w+)").matcher(fileContent);
-                    if (classMatcher.find()) {
-                        detectedClassName = classMatcher.group(1);
-                    }
-                    if (detectedClassName.isEmpty()) {
-                        int lastSlash = fileName.lastIndexOf('/');
-                        String shortName = lastSlash != -1 ? fileName.substring(lastSlash + 1) : fileName;
-                        detectedClassName = shortName.substring(0, shortName.lastIndexOf('.'));
-                    }
-
-                    // חילוץ השם האמיתי של השחקן מתוך PLAYER_NAME_CHARS (תומך גם בפורמט מערך תווים וגם ב-String)
-                    String displayName = detectedClassName;
-
-                    // בדיקה האם מוגדר כמערך תווים כמו {'N', 'O', 'A', 'M'}
-                    Matcher charArrayMatcher = Pattern.compile("PLAYER_NAME_CHARS\\s*=\\s*\\{([^}]+)\\}").matcher(fileContent);
-                    if (charArrayMatcher.find()) {
-                        String charsContent = charArrayMatcher.group(1);
-                        StringBuilder sb = new StringBuilder();
-                        Matcher charFinder = Pattern.compile("'([^']+)'").matcher(charsContent);
-                        while (charFinder.find()) {
-                            sb.append(charFinder.group(1));
-                        }
-                        if (sb.length() > 0) {
-                            displayName = sb.toString().trim();
-                        }
-                    } else {
-                        // בדיקה האם מוגדר כמחרוזת עם toCharArray()
-                        Matcher stringNameMatcher = Pattern.compile("PLAYER_NAME_CHARS\\s*=\\s*\"([^\"]+)\"\\.toCharArray\\(\\)").matcher(fileContent);
-                        if (stringNameMatcher.find()) {
-                            displayName = stringNameMatcher.group(1).trim();
-                        }
-                    }
-
-                    activePlayerDisplayNames.add(displayName);
-
-                    // שמירת הקובץ בתיקייה המקומית
-                    File targetFile = new File(playersDir, detectedClassName + ".java");
-                    try (FileWriter writer = new FileWriter(targetFile)) {
-                        writer.write(fileContent);
-                    }
-
-                    // עדכון ה-JList ב-UI Thread בצורה בטוחה
-                    final String finalName = displayName;
-                    SwingUtilities.invokeLater(() -> {
-                        if (!playerListModel.contains(finalName)) {
-                            playerListModel.addElement(finalName);
-                        }
-                    });
-                }
-            }
-
-            // הסרת שחקנים מהרשימה במידה והקובץ נמחק מהשרת
-            SwingUtilities.invokeLater(() -> {
-                for (int i = playerListModel.size() - 1; i >= 0; i--) {
-                    String listName = playerListModel.getElementAt(i);
-                    if (!activePlayerDisplayNames.contains(listName)) {
-                        playerListModel.remove(i);
-                    }
-                }
-            });
-
-        } catch (Exception ignored) {}
+    private String readDisplayName(File file) {
+        String source;
+        try { source = java.nio.file.Files.readString(file.toPath()); }
+        catch (Exception e) { return file.getName().replaceFirst("\\.java$", ""); }
+        Matcher chars = Pattern.compile("PLAYER_NAME_CHARS\\s*=\\s*\\{([^}]+)\\}").matcher(source);
+        if (chars.find()) {
+            StringBuilder name = new StringBuilder();
+            Matcher each = Pattern.compile("'([^']+)'" ).matcher(chars.group(1));
+            while (each.find()) name.append(each.group(1));
+            if (name.length() > 0) return name.toString().trim();
+        }
+        Matcher string = Pattern.compile("PLAYER_NAME_CHARS\\s*=\\s*\"([^\"]+)\"\\.toCharArray\\(\\)").matcher(source);
+        if (string.find()) return string.group(1).trim();
+        return file.getName().replaceFirst("\\.java$", "");
     }
 
     private void startGame() {
-        if (syncTimer != null) syncTimer.stop();
+        File playersDir = new File("templates/Players").getAbsoluteFile();
+        File[] files = playersDir.listFiles((d, name) -> name.endsWith(".java") && !name.equals("temp_player.java"));
+        if (files == null || files.length == 0) {
+            JOptionPane.showMessageDialog(this,
+                    "לא נמצאו קובצי שחקנים (.java). שמור אותם בתיקייה:\n" + playersDir,
+                    "תיקיית Players ריקה", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        refreshTimer.stop();
         dispose();
-
-        JFrame gameFrame = new JFrame("Algorithm Battle Game");
-        gameFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        gameFrame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-        gameFrame.setUndecorated(true);
-        gameFrame.add(new GameBoard());
-        gameFrame.setVisible(true);
+        JFrame frame = new JFrame("Algorithm Battle Game");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
+        frame.setUndecorated(true);
+        frame.add(new GameBoard());
+        frame.setVisible(true);
     }
 }
+
+
+

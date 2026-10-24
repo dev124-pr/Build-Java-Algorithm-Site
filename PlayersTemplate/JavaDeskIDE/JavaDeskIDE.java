@@ -5,6 +5,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
 import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -15,6 +16,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.JTree;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
@@ -27,7 +29,6 @@ import javax.swing.tree.DefaultTreeCellRenderer;
 import javax.swing.tree.TreePath;
 import javax.swing.plaf.basic.BasicSplitPaneDivider;
 import javax.swing.plaf.basic.BasicSplitPaneUI;
-import java.awt.FileDialog;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
@@ -81,9 +82,6 @@ public class JavaDeskIDE extends JFrame {
     private final JLabel status = new JLabel("בחר פרויקט כדי להתחיל");
     private final JLabel editorTitle = new JLabel("אין קובץ פתוח");
     private JButton saveButton;
-    private JButton importButton;
-    private JButton folderButton;
-    private JButton deleteButton;
     private JButton runButton;
 
     public JavaDeskIDE() {
@@ -104,7 +102,8 @@ public class JavaDeskIDE extends JFrame {
         editor.setForeground(TEXT);
         editor.setCaretColor(Color.WHITE);
         editor.setSelectionColor(new Color(52, 83, 125));
-        editor.setFont(new Font("Consolas", Font.PLAIN, 15));
+        editor.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 15));
+        editor.setComponentOrientation(java.awt.ComponentOrientation.LEFT_TO_RIGHT);
         editor.setTabSize(4);
         editor.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
         editor.setLineWrap(false);
@@ -116,7 +115,8 @@ public class JavaDeskIDE extends JFrame {
         lineNumbers.setBorder(BorderFactory.createEmptyBorder(12, 10, 12, 8));
         console.setBackground(new Color(22, 24, 27));
         console.setForeground(new Color(196, 210, 193));
-        console.setFont(new Font("Consolas", Font.PLAIN, 13));
+        console.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        console.setComponentOrientation(java.awt.ComponentOrientation.LEFT_TO_RIGHT);
         console.setEditable(false);
         console.setBorder(BorderFactory.createEmptyBorder(9, 10, 9, 10));
         status.setForeground(MUTED);
@@ -138,14 +138,7 @@ public class JavaDeskIDE extends JFrame {
         top.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, LINE), BorderFactory.createEmptyBorder(10, 12, 10, 12)));
         JPanel leftActions = new JPanel();
         leftActions.setBackground(BACKGROUND);
-        importButton = button("הוספת קובץ Java");
-        folderButton = button("תיקייה חדשה");
         saveButton = button("שמירה");
-        deleteButton = button("מחיקת קובץ");
-        // File imports are intentionally available only from templates/Players.
-        importButton.setVisible(false);
-        folderButton.setVisible(false);
-        deleteButton.setVisible(false);
         runButton = button("הרצת GameMain");
         runButton.setBackground(new Color(43, 105, 66));
         runButton.setForeground(Color.WHITE);
@@ -203,10 +196,7 @@ public class JavaDeskIDE extends JFrame {
         add(mainSplit, BorderLayout.CENTER);
         add(bottom, BorderLayout.SOUTH);
 
-        importButton.addActionListener(e -> importJavaFile());
-        folderButton.addActionListener(e -> createFolder());
         saveButton.addActionListener(e -> saveCurrentFile());
-        deleteButton.addActionListener(e -> deleteSelectedFile());
         runButton.addActionListener(e -> runGameMain());
         fileTree.addTreeSelectionListener(e -> openSelectedFile());
         fileTree.addMouseListener(new MouseAdapter() {
@@ -278,17 +268,11 @@ public class JavaDeskIDE extends JFrame {
         if (!(value instanceof FileEntry)) return;
         FileEntry entry = (FileEntry) value;
         JPopupMenu menu = new JPopupMenu();
-        if (entry.directory && entry.path != null && entry.path.normalize().equals(playersDirectory())) {
-            JMenuItem importJava = new JMenuItem("Import from File Explorer…");
-            importJava.addActionListener(e -> importJavaFile());
-            menu.add(importJava);
-        } else if (!entry.directory && entry.path != null && entry.owned) {
-            JMenuItem delete = new JMenuItem("Delete");
-            delete.addActionListener(e -> deleteSelectedFile());
-            menu.add(delete);
-        } else {
-            return;
-        }
+        if (!entry.directory && entry.path != null && entry.owned) {
+            JMenuItem rename = new JMenuItem("Rename");
+            rename.addActionListener(e -> renamePlayerFile(entry.path));
+            menu.add(rename);
+        } else return;
         menu.setBackground(Color.WHITE);
         menu.setBorder(BorderFactory.createLineBorder(new Color(190, 195, 203)));
         for (java.awt.Component component : menu.getComponents()) {
@@ -299,79 +283,6 @@ public class JavaDeskIDE extends JFrame {
             }
         }
         menu.show(fileTree, event.getX(), event.getY());
-    }
-
-    private void importJavaFile() {
-        FileDialog chooser = new FileDialog(this, "Import Java file", FileDialog.LOAD);
-        chooser.setFilenameFilter((directory, name) -> name.toLowerCase(Locale.ROOT).endsWith(".java"));
-        chooser.setFile("*.java");
-        chooser.setVisible(true);
-        if (chooser.getFile() == null) return;
-        Path source = Paths.get(chooser.getDirectory(), chooser.getFile());
-        if (!source.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".java")) { showInfo("אפשר להוסיף קובצי ‎.java‎ בלבד."); return; }
-        Path destination = playersDirectory();
-        if (!Files.isDirectory(destination)) { showInfo("לא נמצאה תיקיית היעד templates\\Players."); return; }
-        Path target = destination.resolve(source.getFileName());
-        try {
-            if (Files.exists(target)) {
-                if (!isOwnedFile(target)) { showInfo("הקובץ הזה קיים והוא קובץ מובנה. אי אפשר להחליף אותו."); return; }
-                int answer = JOptionPane.showConfirmDialog(this, "להחליף את הקובץ שאתה הוספת?", "החלפת קובץ", JOptionPane.YES_NO_OPTION);
-                if (answer != JOptionPane.YES_OPTION) return;
-            }
-            Files.copy(source, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            markOwnedFile(target);
-            refreshTree();
-            status.setText("נוסף קובץ לתיקיית Players: " + target.getFileName());
-            openFile(target);
-        } catch (IOException ex) { showError("לא ניתן להוסיף את הקובץ", ex); }
-    }
-
-    private void createFolder() {
-        createFolderIn(selectedUserDirectory());
-    }
-
-    private void createFolderIn(Path parent) {
-        String name = JOptionPane.showInputDialog(this, "שם התיקייה החדשה:");
-        if (name == null || name.trim().isEmpty() || name.contains("/") || name.contains("\\")) return;
-        try {
-            Files.createDirectories(parent.resolve(name.trim()));
-            refreshTree();
-        } catch (IOException ex) { showError("לא ניתן ליצור תיקייה", ex); }
-    }
-
-    private void createNewJavaFile(Path directory) {
-        if (!directory.toAbsolutePath().normalize().equals(playersDirectory())) { showInfo("אפשר להוסיף קובצי Java רק לתיקייה templates\\Players."); return; }
-        String entered = JOptionPane.showInputDialog(this, "שם קובץ Java חדש:", "NewClass.java");
-        if (entered == null || entered.trim().isEmpty() || entered.contains("/") || entered.contains("\\")) return;
-        String name = entered.trim();
-        if (!name.toLowerCase(Locale.ROOT).endsWith(".java")) name += ".java";
-        if (!name.matches("[A-Za-z_$][A-Za-z0-9_$]*\\.java")) {
-            showInfo("שם הקובץ צריך להיות שם Java תקין, למשל MyClass.java.");
-            return;
-        }
-        Path file = directory.resolve(name).normalize();
-        if (!file.startsWith(workspaceDir)) { showInfo("אפשר ליצור קובץ רק בתוך תיקיית JavaDeskIDE."); return; }
-        if (Files.exists(file)) { showInfo("כבר קיים קובץ בשם הזה בתיקייה."); return; }
-        try {
-            Files.createDirectories(directory);
-            String className = name.substring(0, name.length() - ".java".length());
-            Files.writeString(file, "public class " + className + " {\n    public " + className + "() {\n    }\n}\n", StandardCharsets.UTF_8);
-            markOwnedFile(file);
-            refreshTree();
-            openFile(file);
-            status.setText("נוצר קובץ Java: " + workspaceDir.relativize(file));
-        } catch (IOException ex) { showError("לא ניתן ליצור את הקובץ", ex); }
-    }
-
-    private Path selectedUserDirectory() {
-        Path fallback = workspaceDir;
-        Object selected = fileTree.getLastSelectedPathComponent();
-        if (!(selected instanceof DefaultMutableTreeNode)) return fallback;
-        Object value = ((DefaultMutableTreeNode) selected).getUserObject();
-        if (!(value instanceof FileEntry)) return fallback;
-        FileEntry entry = (FileEntry) value;
-        if (entry.path == null || !entry.path.normalize().startsWith(workspaceDir)) return fallback;
-        return Files.isDirectory(entry.path) ? entry.path : entry.path.getParent();
     }
 
     private Path playersDirectory() { return workspaceDir.resolve("templates").resolve("Players").toAbsolutePath().normalize(); }
@@ -416,7 +327,7 @@ public class JavaDeskIDE extends JFrame {
         try {
             currentFile = path.toAbsolutePath().normalize();
             currentFileOwned = isOwnedFile(currentFile);
-            if (!currentFileOwned) { currentFile = null; showInfo("אפשר לפתוח רק קובץ Java שהוספת."); return; }
+            if (!currentFileOwned) { currentFile = null; showInfo("אפשר לפתוח ולערוך רק את קובץ השחקן בתיקיית templates\\Players."); return; }
             editor.setText(new String(Files.readAllBytes(currentFile), StandardCharsets.UTF_8));
             editor.setCaretPosition(0);
             dirty = false;
@@ -445,7 +356,7 @@ public class JavaDeskIDE extends JFrame {
     private void saveCurrentFile() {
         if (currentFile == null || !currentFileOwned || !editor.isEditable()) return;
         try {
-            if (!isOwnedFile(currentFile)) { showInfo("אפשר לשמור רק קבצים שהוספת."); return; }
+            if (!isOwnedFile(currentFile)) { showInfo("אפשר לשמור רק את קובץ השחקן שבתיקיית templates\\Players."); return; }
             Files.write(currentFile, editor.getText().getBytes(StandardCharsets.UTF_8));
             dirty = false;
             editorTitle.setText(currentFile.getFileName().toString());
@@ -454,25 +365,39 @@ public class JavaDeskIDE extends JFrame {
         } catch (IOException ex) { showError("לא ניתן לשמור את הקובץ", ex); }
     }
 
-    private void deleteSelectedFile() {
-        Object selected = fileTree.getLastSelectedPathComponent();
-        if (!(selected instanceof DefaultMutableTreeNode)) return;
-        Object value = ((DefaultMutableTreeNode) selected).getUserObject();
-        if (!(value instanceof FileEntry)) return;
-        FileEntry entry = (FileEntry) value;
-        if (!entry.owned || entry.path == null || entry.directory) {
-            showInfo("אפשר למחוק רק קובץ Java שהוספת."); return;
+    private void renamePlayerFile(Path path) {
+        if (!isOwnedFile(path)) return;
+        if (!confirmDiscardIfNeeded()) return;
+        String oldName = path.getFileName().toString();
+        String entered = JOptionPane.showInputDialog(this, "שם חדש לקובץ (כולל ‎.java‎):", oldName);
+        if (entered == null) return;
+        String newName = entered.trim();
+        if (!newName.matches("[A-Za-z_$][A-Za-z0-9_$]*\\.java")) {
+            showInfo("יש לבחור שם Java תקין שמסתיים ב־.java, למשל Player.java.");
+            return;
         }
-        if (JOptionPane.showConfirmDialog(this, "למחוק את " + entry.path.getFileName() + "?", "מחיקת קובץ", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return;
+        Path target = playersDirectory().resolve(newName).normalize();
+        if (target.equals(path.toAbsolutePath().normalize())) return;
+        if (Files.exists(target)) { showInfo("כבר קיים קובץ בשם הזה בתיקיית Players."); return; }
         try {
-            if (currentFile != null && currentFile.equals(entry.path.toAbsolutePath().normalize())) {
-                currentFile = null; dirty = false; editor.setText(""); editor.setEditable(false); editorTitle.setText("אין קובץ פתוח");
+            String oldClassName = oldName.substring(0, oldName.length() - ".java".length());
+            String newClassName = newName.substring(0, newName.length() - ".java".length());
+            String source = Files.readString(path, StandardCharsets.UTF_8);
+            Files.move(path, target);
+            java.util.regex.Pattern publicType = java.util.regex.Pattern.compile(
+                    "(?m)(\\bpublic\\s+(?:(?:abstract|final|sealed|non-sealed)\\s+)*(?:class|interface|enum|record)\\s+)"
+                            + java.util.regex.Pattern.quote(oldClassName) + "\\b");
+            String renamedSource = publicType.matcher(source).replaceAll("$1" + Matcher.quoteReplacement(newClassName));
+            if (!renamedSource.equals(source)) Files.writeString(target, renamedSource, StandardCharsets.UTF_8);
+            Preferences.userNodeForPackage(JavaDeskIDE.class).put("editable-player-file", workspaceDir.relativize(target).toString());
+            if (currentFile != null && currentFile.equals(path.toAbsolutePath().normalize())) {
+                currentFile = target;
+                currentFileOwned = true;
+                editorTitle.setText(newName);
             }
-            Files.delete(entry.path);
-            unmarkOwnedFile(entry.path);
-            refreshTree(); updateActions();
-            status.setText("הקובץ נמחק.");
-        } catch (IOException ex) { showError("לא ניתן למחוק את הקובץ", ex); }
+            refreshTree();
+            status.setText("שם הקובץ שונה ל־" + newName);
+        } catch (IOException ex) { showError("לא ניתן לשנות את שם הקובץ", ex); }
     }
 
     private boolean confirmDiscardIfNeeded() {
@@ -507,9 +432,6 @@ public class JavaDeskIDE extends JFrame {
         Path gameMain = templates.resolve("game").resolve("GameMain.java");
         if (!Files.isRegularFile(gameMain)) throw new IllegalStateException("לא נמצא קובץ ההרצה הקבוע: " + gameMain);
         collectJavaSources(templates, sources);
-        for (Path owned : getOwnedFiles()) {
-            if (owned.toString().toLowerCase(Locale.ROOT).endsWith(".java") && !owned.startsWith(templates)) sources.add(owned);
-        }
         if (!sources.contains(gameMain)) throw new IllegalStateException("GameMain.java לא נכלל בקומפילציה.");
         String mainClass = resolveMainClass(gameMain);
         deleteTree(buildDir);
@@ -582,10 +504,7 @@ public class JavaDeskIDE extends JFrame {
     }
 
     private void updateActions() {
-        importButton.setEnabled(workspaceDir != null && Files.isDirectory(workspaceDir));
-        folderButton.setEnabled(workspaceDir != null && Files.isDirectory(workspaceDir));
         saveButton.setEnabled(currentFile != null && currentFileOwned && editor.isEditable() && dirty);
-        deleteButton.setEnabled(currentFile != null && currentFileOwned);
         runButton.setEnabled(workspaceDir != null && Files.isDirectory(workspaceDir));
     }
 
@@ -626,44 +545,16 @@ public class JavaDeskIDE extends JFrame {
                 || Files.isRegularFile(directory.resolve("templates/game/GameMain.java")));
     }
 
-    private Path ownershipManifest() { return workspaceDir.resolve(".javadesk-owned-files"); }
-
-    private java.util.Set<Path> getOwnedFiles() throws IOException {
-        java.util.Set<Path> owned = new java.util.LinkedHashSet<>();
-        Path manifest = ownershipManifest();
-        if (!Files.isRegularFile(manifest)) return owned;
-        for (String line : Files.readAllLines(manifest, StandardCharsets.UTF_8)) {
-            if (line.trim().isEmpty()) continue;
-            Path path = workspaceDir.resolve(line.trim()).normalize();
-            if (path.startsWith(playersDirectory()) && Files.isRegularFile(path)) owned.add(path);
-        }
-        return owned;
+    private Path editablePlayerFile() {
+        String stored = Preferences.userNodeForPackage(JavaDeskIDE.class).get("editable-player-file", "");
+        Path candidate = stored.isBlank() ? playersDirectory().resolve("player.java") : workspaceDir.resolve(stored).toAbsolutePath().normalize();
+        if (candidate.getParent() != null && candidate.getParent().equals(playersDirectory())
+                && candidate.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".java")) return candidate;
+        return playersDirectory().resolve("player.java");
     }
 
     private boolean isOwnedFile(Path path) {
-        try {
-            Path normalized = path.toAbsolutePath().normalize();
-            return normalized.startsWith(playersDirectory()) && getOwnedFiles().contains(normalized);
-        }
-        catch (IOException ex) { return false; }
-    }
-
-    private void markOwnedFile(Path path) throws IOException {
-        java.util.Set<Path> owned = getOwnedFiles();
-        owned.add(path.toAbsolutePath().normalize());
-        writeOwnedFiles(owned);
-    }
-
-    private void unmarkOwnedFile(Path path) throws IOException {
-        java.util.Set<Path> owned = getOwnedFiles();
-        owned.remove(path.toAbsolutePath().normalize());
-        writeOwnedFiles(owned);
-    }
-
-    private void writeOwnedFiles(java.util.Set<Path> owned) throws IOException {
-        List<String> relative = new ArrayList<>();
-        for (Path path : owned) if (path.startsWith(workspaceDir)) relative.add(workspaceDir.relativize(path).toString());
-        Files.write(ownershipManifest(), relative, StandardCharsets.UTF_8);
+        return path != null && path.toAbsolutePath().normalize().equals(editablePlayerFile());
     }
 
     private static class FileEntry {

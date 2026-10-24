@@ -1,4 +1,4 @@
-package templates.game;
+package game;
 
 import java.awt.Color;
 
@@ -10,7 +10,7 @@ public class PlayerEntity {
     public PlayerAI aiInstance;
     public int score;
     public boolean isDisqualified;
-    public String deathReason; // שומר את סיבת הפסילה / המוות (למשל: "killed by beef", "timeout", "compilation error")
+    public String deathReason;
 
     public PlayerEntity(String name, int x, int y, Color color, PlayerAI aiInstance) {
         this.name = name;

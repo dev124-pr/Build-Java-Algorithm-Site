@@ -1,4 +1,4 @@
-package templates.game;
+package game;
 
 import javax.tools.*;
 import javax.swing.*;
@@ -49,7 +49,7 @@ public class GameBoard extends JPanel implements ActionListener {
     public GameBoard() {
         setBackground(new Color(15, 23, 42));
 
-        downloadJavaFilesRecursively("");
+
         loadPlayersDynamic();
         initTargets();
 
@@ -185,7 +185,8 @@ public class GameBoard extends JPanel implements ActionListener {
     }
 
     private void loadPlayersDynamic() {
-        File playersDir = new File("D:\\BuildAnAlgorithm\\BuildAnAlgorithm\\Players");
+        // חיפוש בתיקיית Players שנמצאת בשורש הפרויקט
+        File playersDir = new File("templates/Players");
         if (!playersDir.exists()) playersDir.mkdirs();
 
         File[] files = playersDir.listFiles((dir, name) -> name.endsWith(".java") && !name.equals("temp_player.java"));
@@ -200,12 +201,21 @@ public class GameBoard extends JPanel implements ActionListener {
 
             try {
                 JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-                if (compiler != null) compiler.run(null, null, null, file.getPath());
-
-                File srcParentDir = new File("D:\\BuildAnAlgorithm\\BuildAnAlgorithm");
-                if (!srcParentDir.exists()) srcParentDir = new File(".");
-
-                URLClassLoader classLoader = new URLClassLoader(new URL[]{srcParentDir.toURI().toURL()});
+                if (compiler == null) {
+                    throw new IllegalStateException("A full JDK is required to compile player files.");
+                }
+                File classRoot = playersDir.getParentFile();
+                String classPath = System.getProperty("java.class.path") + File.pathSeparator + classRoot.getAbsolutePath();
+                int compileResult = compiler.run(null, null, null,
+                        "-classpath", classPath,
+                        "-d", classRoot.getAbsolutePath(),
+                        file.getAbsolutePath());
+                if (compileResult != 0) {
+                    throw new IllegalStateException("Player compilation failed: " + file.getName());
+                }
+                URLClassLoader classLoader = new URLClassLoader(
+                        new URL[]{classRoot.toURI().toURL()}, getClass().getClassLoader());
+                // טעינת המחלקה מתוך ה-Package הנכון Players
                 Class<?> cls = Class.forName("Players." + className, true, classLoader);
                 PlayerAI ai = (PlayerAI) cls.getDeclaredConstructor().newInstance();
 
@@ -317,75 +327,11 @@ public class GameBoard extends JPanel implements ActionListener {
     }
 
     private boolean clearEverythingFromStorageAndLocal() {
-        try {
-            HttpClient client = HttpClient.newHttpClient();
-
-            // Check that this API key can actually see rows before claiming success.
-            String tableUrl = SUPABASE_URL + "/rest/v1/java_files?id=not.is.null";
-            HttpRequest tableCheckRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(tableUrl + "&select=id&limit=1"))
-                    .header("apikey", SUPABASE_KEY)
-                    .header("Authorization", "Bearer " + SUPABASE_KEY)
-                    .GET()
-                    .build();
-            HttpResponse<String> tableBefore = client.send(tableCheckRequest, HttpResponse.BodyHandlers.ofString());
-            requireSuccess("Database check", tableBefore.statusCode(), tableBefore.body());
-            if (tableBefore.body().trim().equals("[]")) {
-                throw new IllegalStateException("No rows are visible in public.java_files. The table may be wrong or RLS may hide its rows.");
-            }
-
-            HttpRequest tableDeleteRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(tableUrl))
-                    .header("apikey", SUPABASE_KEY)
-                    .header("Authorization", "Bearer " + SUPABASE_KEY)
-                    .header("Prefer", "return=representation")
-                    .DELETE()
-                    .build();
-            HttpResponse<String> tableResponse = client.send(tableDeleteRequest, HttpResponse.BodyHandlers.ofString());
-            requireSuccess("Database delete", tableResponse.statusCode(), tableResponse.body());
-            if (tableResponse.body().trim().equals("[]")) {
-                throw new IllegalStateException("Supabase accepted the request but deleted zero rows. Check the table name and DELETE RLS policy.");
-            }
-            HttpRequest tableVerifyRequest = HttpRequest.newBuilder()
-                    .uri(URI.create(tableUrl + "&select=id&limit=1"))
-                    .header("apikey", SUPABASE_KEY)
-                    .header("Authorization", "Bearer " + SUPABASE_KEY)
-                    .GET()
-                    .build();
-            HttpResponse<String> tableAfter = client.send(tableVerifyRequest, HttpResponse.BodyHandlers.ofString());
-            requireSuccess("Database verification", tableAfter.statusCode(), tableAfter.body());
-            if (!tableAfter.body().trim().equals("[]")) {
-                throw new IllegalStateException("Rows are still visible in public.java_files after the delete request.");
-            }
-
-            // Deletes all files in the bucket through the Storage API.
-            deleteStorageFolderRecursively(client, "");
-            if (storageHasObjects(client, "")) {
-                throw new IllegalStateException("Storage still contains files after the delete request. Check Storage SELECT/DELETE policies.");
-            }
-
-            File playersDir = new File("D:\\BuildAnAlgorithm\\BuildAnAlgorithm\\Players");
-            if (playersDir.exists()) {
-                File[] files = playersDir.listFiles();
-                if (files == null) throw new IllegalStateException("Could not read local Players folder.");
-                for (File f : files) {
-                    if (f.isFile() && !f.delete()) {
-                        throw new IllegalStateException("Could not delete local file: " + f.getAbsolutePath());
-                    }
-                }
-            }
-            gameConsole.addLog("Database, Storage, and local player files deleted.");
-            return true;
-        } catch (Exception e) {
-            gameConsole.addLog("Delete failed: " + e.getMessage());
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
-                    "המחיקה נכשלה:\n" + e.getMessage(), "שגיאה במחיקה", JOptionPane.ERROR_MESSAGE);
-            return false;
-        }
+        // Cloud storage is not used; returning to the lobby keeps local Players files intact.
+        return true;
     }
 
-    private void deleteStorageFolderRecursively(HttpClient client, String prefix) throws Exception {
+    private void deleteStorageFolderAndCollect(HttpClient client, String prefix, List<String> deletedFileNames) throws Exception {
         String listUrl = SUPABASE_URL + "/storage/v1/object/list/" + STORAGE_BUCKET;
         List<String> files = new ArrayList<>();
         List<String> folders = new ArrayList<>();
@@ -416,9 +362,12 @@ public class GameBoard extends JPanel implements ActionListener {
             offset += pageSize;
         }
 
-        for (String folder : folders) deleteStorageFolderRecursively(client, folder);
+        for (String folder : folders) {
+            deleteStorageFolderAndCollect(client, folder, deletedFileNames);
+        }
 
-        // Supabase bulk removal accepts up to 1000 paths per request.
+        File playersDir = new File("D:\\BuildAnAlgorithm\\BuildAnAlgorithm\\Players");
+
         for (int start = 0; start < files.size(); start += 1000) {
             List<String> batch = files.subList(start, Math.min(start + 1000, files.size()));
             StringBuilder body = new StringBuilder("{\"prefixes\":[");
@@ -436,6 +385,19 @@ public class GameBoard extends JPanel implements ActionListener {
                     .build();
             HttpResponse<String> response = client.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
             requireSuccess("Storage delete", response.statusCode(), response.body());
+
+            for (String filePath : batch) {
+                String shortName = filePath.substring(filePath.lastIndexOf('/') + 1);
+                if (shortName.toLowerCase().endsWith(".java")) {
+                    String className = shortName.substring(0, shortName.lastIndexOf('.'));
+                    if (playersDir.exists()) {
+                        File targetFile = new File(playersDir, className + ".java");
+                        if (targetFile.exists()) {
+                            targetFile.delete();
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -459,37 +421,6 @@ public class GameBoard extends JPanel implements ActionListener {
             }
         }
         return objects;
-    }
-
-    private boolean storageHasObjects(HttpClient client, String prefix) throws Exception {
-        String listUrl = SUPABASE_URL + "/storage/v1/object/list/" + STORAGE_BUCKET;
-        int offset = 0;
-        final int pageSize = 100;
-        while (true) {
-            String body = "{\"prefix\":\"" + jsonEscape(prefix) + "\",\"limit\":" + pageSize + ",\"offset\":" + offset + "}";
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(listUrl))
-                    .header("apikey", SUPABASE_KEY)
-                    .header("Authorization", "Bearer " + SUPABASE_KEY)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .build();
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            requireSuccess("Storage verification", response.statusCode(), response.body());
-            List<String> entries = splitJsonArrayObjects(response.body());
-            for (String entry : entries) {
-                String name = extractJsonValue(entry, "name");
-                if (name.isEmpty()) continue;
-                if (Pattern.compile("\\\"id\\\"\\s*:\\s*null").matcher(entry).find()) {
-                    String childPrefix = prefix.isEmpty() ? name : prefix + "/" + name;
-                    if (storageHasObjects(client, childPrefix)) return true;
-                } else {
-                    return true;
-                }
-            }
-            if (entries.size() < pageSize) return false;
-            offset += pageSize;
-        }
     }
 
     private String jsonEscape(String value) {
@@ -881,3 +812,4 @@ public class GameBoard extends JPanel implements ActionListener {
         }
     }
 }
+
