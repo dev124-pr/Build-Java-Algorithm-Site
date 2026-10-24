@@ -140,7 +140,41 @@
   }
   function setupDownload() {
     const button = $("downloadButton");
-    if (cfg.downloadUrl) { button.href = cfg.downloadUrl; button.classList.remove("disabled"); button.classList.add("ready"); button.removeAttribute("aria-disabled"); button.target = "_blank"; button.rel = "noopener"; $("downloadButtonText").textContent = "הורדת התוכנה"; $("downloadBadge").textContent = "זמין להורדה"; $("downloadBadge").style.color = "var(--lime)"; $("downloadDescription").textContent = "הורידו את תוכנת CodeDrop והתחילו לעבוד עם הקבצים שלכם."; $("downloadMeta").textContent = cfg.downloadLabel || "Windows · קובץ התקנה"; }
+    if (cfg.downloadUrl) {
+      button.href = cfg.downloadUrl;
+      button.classList.remove("disabled"); button.classList.add("ready"); button.removeAttribute("aria-disabled");
+      button.removeAttribute("target"); button.removeAttribute("rel");
+      let fileName = cfg.downloadFileName || "";
+      if (!fileName) { try { fileName = decodeURIComponent(new URL(cfg.downloadUrl, window.location.href).pathname.split("/").pop()); } catch { fileName = "download.java"; } }
+      if (fileName) button.download = fileName;
+      $("downloadButtonText").textContent = "הורדת קובץ Java";
+      $("downloadBadge").textContent = "זמין להורדה"; $("downloadBadge").style.color = "var(--lime)";
+      $("downloadDescription").textContent = `הורידו את ${fileName} למחשב שלכם.`;
+      $("downloadMeta").textContent = cfg.downloadLabel || "JAVA SOURCE · קובץ Java";
+      button.addEventListener("click", async (event) => {
+        event.preventDefault();
+        if (button.dataset.downloading === "true") return;
+        button.dataset.downloading = "true";
+        const label = $("downloadButtonText").textContent;
+        $("downloadButtonText").textContent = "מכינים את הקובץ…";
+        try {
+          const response = await fetch(button.href, { cache: "no-store" });
+          if (!response.ok) throw new Error(`Download failed: ${response.status}`);
+          const blobUrl = URL.createObjectURL(await response.blob());
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = fileName || "download.java";
+          document.body.append(link); link.click(); link.remove();
+          window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        } catch (error) {
+          toast("לא הצלחנו להוריד את הקובץ. בדוק/י שהוא נמצא במאגר שפורסם.", "error");
+          console.error(error);
+        } finally {
+          button.dataset.downloading = "false";
+          $("downloadButtonText").textContent = label;
+        }
+      });
+    }
     else button.addEventListener("click", (event) => event.preventDefault());
   }
   document.querySelectorAll(".nav-item").forEach((item) => item.addEventListener("click", (event) => { event.preventDefault(); history.replaceState(null, "", item.getAttribute("href")); showPage(item.dataset.page); }));
