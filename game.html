@@ -1,0 +1,472 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#111312" />
+    <title>הורדת המשחק — CodeDrop</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+    <style>
+        :root {
+            --bg: #111312;
+            --panel: #191c1a;
+            --line: #2a2e2b;
+            --text: #f1f3f1;
+            --lime: #c4f36b;
+            --mono: "IBM Plex Mono", monospace;
+            --sans: "Heebo", sans-serif;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(ellipse at 78% 15%, #252d20 0, transparent 34%), var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            font-size: 14px;
+        }
+
+        .shell {
+            max-width: 1080px;
+            margin: auto;
+            padding: 0 42px;
+        }
+
+        .topbar {
+            height: 66px;
+            border-bottom: 1px solid #252825;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text);
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -.5px;
+            text-decoration: none;
+        }
+
+        .brand-light { color: #8b918d; font-weight: 500; }
+
+        .mark {
+            width: 25px;
+            height: 25px;
+            display: flex;
+            gap: 3px;
+            align-items: center;
+            justify-content: center;
+            background: var(--lime);
+            border-radius: 8px;
+            transform: rotate(-8deg);
+        }
+
+        .mark i {
+            width: 3px;
+            height: 9px;
+            background: #1a2111;
+            border-radius: 3px;
+        }
+
+        .mark i:nth-child(2) { height: 15px; }
+        .mark i:nth-child(3) { height: 11px; }
+
+        .status {
+            font-size: 10px;
+            color: #a9b1a9;
+            border: 1px solid #333a33;
+            border-radius: 20px;
+            padding: 5px 10px;
+        }
+
+        .status i {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background: var(--lime);
+            border-radius: 50%;
+            margin-left: 5px;
+        }
+
+        .hero {
+            min-height: 300px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            align-items: center;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .eyebrow {
+            font: 9px var(--mono);
+            letter-spacing: 1.45px;
+            color: #8c948c;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 18px;
+            height: 1px;
+            background: var(--lime);
+        }
+
+        h1 {
+            font-size: 46px;
+            letter-spacing: -1.8px;
+            line-height: 1.12;
+            margin: 14px 0 8px;
+            font-weight: 600;
+        }
+
+        h1 span { color: var(--lime); }
+
+        .intro {
+            max-width: 390px;
+            color: #989f98;
+            font-size: 12px;
+            line-height: 1.9;
+            margin: 12px 0 0;
+        }
+
+        .art {
+            height: 260px;
+            position: relative;
+            display: grid;
+            place-items: center;
+        }
+
+        .orbit {
+            position: absolute;
+            border: 1px solid #2b302a;
+            border-radius: 50%;
+            width: 330px;
+            height: 155px;
+            transform: rotate(-22deg);
+        }
+
+        .orbit.two {
+            width: 250px;
+            height: 125px;
+            transform: rotate(37deg);
+            border-color: #272d27;
+        }
+
+        .game-icon {
+            position: relative;
+            width: 155px;
+            height: 155px;
+            border: 1px solid #41483e;
+            border-radius: 30px;
+            background: linear-gradient(145deg, #292f27, #191c1a);
+            box-shadow: 0 24px 60px #0008;
+            display: grid;
+            place-items: center;
+            transform: rotate(-7deg);
+        }
+
+        .game-icon span {
+            font: 600 53px var(--mono);
+            letter-spacing: -6px;
+            color: var(--lime);
+            text-shadow: 0 0 30px #c4f36b35;
+        }
+
+        .spark {
+            position: absolute;
+            color: var(--lime);
+            font-size: 19px;
+            top: 46px;
+            right: 23%;
+        }
+
+        .spark.two {
+            top: auto;
+            right: auto;
+            bottom: 39px;
+            left: 21%;
+            color: #aaa2ff;
+            font-size: 22px;
+        }
+
+        .panel {
+            min-height: 125px;
+            border: 1px solid #2e332e;
+            background: linear-gradient(110deg, #1b1f1b, #191c1a);
+            border-radius: 10px;
+            margin-top: 25px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 15px 45px #0002;
+        }
+
+        .file-icon {
+            position: relative;
+            height: 48px;
+            width: 48px;
+            flex: none;
+            border: 1px solid #4c533e;
+            background: #252b21;
+            border-radius: 9px;
+            display: grid;
+            place-items: center;
+            color: #d3f28b;
+            font: 600 18px var(--mono);
+        }
+
+        .file-icon i {
+            position: absolute;
+            bottom: -6px;
+            right: -7px;
+            font-style: normal;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            background: var(--lime);
+            color: #17200f;
+            font-size: 13px;
+            border: 2px solid #1a1d1b;
+        }
+
+        .copy { min-width: 0; }
+
+        .title-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .title-row h2 {
+            font-size: 14px;
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .badge {
+            font-size: 9px;
+            color: #e8be70;
+            border: 1px solid #5b4831;
+            border-radius: 9px;
+            padding: 2px 8px;
+            white-space: nowrap;
+        }
+
+        .copy p {
+            margin: 6px 0;
+            color: #919890;
+            font-size: 10px;
+            line-height: 1.6;
+        }
+
+        .copy small {
+            color: #6f766f;
+            font: 9px var(--mono);
+        }
+
+        .download {
+            margin-right: auto;
+            height: 39px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0 16px;
+            border-radius: 6px;
+            background: #313730;
+            color: #929990;
+            font-size: 11px;
+            white-space: nowrap;
+            text-decoration: none;
+            cursor: not-allowed;
+            opacity: .68;
+        }
+
+        .download.ready {
+            background: var(--lime);
+            color: #18200f;
+            font-weight: 700;
+            cursor: pointer;
+            opacity: 1;
+            transition: .15s;
+        }
+
+        .download.ready:hover {
+            background: #d0fa82;
+            transform: translateY(-1px);
+        }
+
+        .footnote {
+            margin-top: 13px;
+            color: #737a73;
+            font-size: 10px;
+        }
+
+        .footnote span {
+            color: #a2aa9f;
+            margin-left: 5px;
+        }
+
+        .footer {
+            margin-top: 54px;
+            border-top: 1px solid #252825;
+            display: flex;
+            justify-content: space-between;
+            padding: 14px 0;
+            color: #686f69;
+            font: 8px var(--mono);
+            letter-spacing: .5px;
+        }
+
+        .footer b { color: var(--lime); }
+
+        @media (max-width: 700px) {
+            .shell { padding: 0 20px; }
+
+            .hero {
+                grid-template-columns: 1fr;
+                min-height: 0;
+            }
+
+            .hero-copy { padding: 36px 0 0; }
+            .hero h1 { font-size: 39px; }
+            .art { height: 220px; }
+            .orbit { width: 290px; }
+
+            .panel {
+                flex-wrap: wrap;
+                padding: 16px;
+                gap: 12px;
+            }
+
+            .copy { flex: 1; }
+
+            .download {
+                width: 100%;
+                margin: 5px 0 0;
+            }
+
+            .footer { margin-top: 35px; }
+        }
+
+        @media (max-width: 390px) {
+            .shell { padding: 0 15px; }
+            .title-row { flex-wrap: wrap; }
+            .hero h1 { font-size: 35px; }
+        }
+    </style>
+</head>
+
+<body>
+<div class="shell">
+    <header class="topbar">
+        <a class="brand" href="./" aria-label="CodeDrop">
+            <span class="mark"><i></i><i></i><i></i></span>
+            <span>code<span class="brand-light">drop</span></span>
+        </a>
+        <span class="status"><i></i> מרחב פרטי</span>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero-copy">
+                <div class="eyebrow">GAME DOWNLOAD</div>
+                <h1>המשחק שלך.<br /><span>מוכן להורדה.</span></h1>
+                <p class="intro">
+                    כאן אפשר להוריד את קובץ המשחק. כשהקובץ יהיה זמין,
+                    כפתור ההורדה יופעל אוטומטית.
+                </p>
+            </div>
+
+            <div class="art" aria-hidden="true">
+                <div class="orbit"></div>
+                <div class="orbit two"></div>
+                <div class="game-icon"><span>JAVA</span></div>
+                <div class="spark">✳</div>
+                <div class="spark two">✦</div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="קובץ המשחק">
+            <div class="file-icon">J<i>↓</i></div>
+
+            <div class="copy">
+                <div class="title-row">
+                    <h2 id="fileTitle">קובץ המשחק</h2>
+                    <span class="badge" id="fileBadge">בקרוב</span>
+                </div>
+                <p id="fileDescription">קובץ המשחק עדיין לא הוגדר להורדה.</p>
+                <small id="fileMeta">GAME · DOWNLOAD</small>
+            </div>
+
+            <a
+                    class="download"
+                    id="downloadButton"
+                    href="#"
+                    aria-disabled="true"
+                    tabindex="-1"
+            >
+                <span>↓</span>
+                <span id="buttonText">ההורדה תיפתח בקרוב</span>
+            </a>
+        </section>
+
+        <div class="footnote">
+            <span>ⓘ</span>
+            כשהקובץ יהיה מוכן, הגדירו את הקישור בתחילת הסקריפט.
+        </div>
+    </main>
+
+    <footer class="footer">
+        <span>© 2026 CODEDROP</span>
+        <span>נבנה בשביל המשחק שלך <b>✳</b></span>
+    </footer>
+</div>
+
+<script>
+    // כשיש קובץ, הכניסו כאן את הנתיב אליו ואת שם הקובץ שיורד.
+    const GAME_DOWNLOAD_URL = "";
+    const GAME_FILE_NAME = "";
+
+    const button = document.getElementById("downloadButton");
+
+    if (GAME_DOWNLOAD_URL) {
+        button.href = new URL(GAME_DOWNLOAD_URL, window.location.href).href;
+        button.classList.add("ready");
+        button.removeAttribute("aria-disabled");
+        button.removeAttribute("tabindex");
+        button.setAttribute("download", GAME_FILE_NAME || "");
+
+        document.getElementById("fileBadge").textContent = "זמין להורדה";
+        document.getElementById("fileBadge").style.color = "var(--lime)";
+        document.getElementById("fileBadge").style.borderColor = "#485a36";
+
+        document.getElementById("fileDescription").textContent =
+            GAME_FILE_NAME
+                ? `הורידו את ${GAME_FILE_NAME} למחשב שלכם.`
+                : "קובץ המשחק זמין להורדה.";
+
+        document.getElementById("fileMeta").textContent =
+            GAME_FILE_NAME || "GAME · DOWNLOAD";
+
+        document.getElementById("buttonText").textContent = "הורדת המשחק";
+    } else {
+        button.addEventListener("click", event => event.preventDefault());
+    }
+</script>
+</body>
+</html>
